@@ -1,0 +1,65 @@
+.\" Copyright (C) 2025 MrR736
+.\"
+.TH BTH 1 "March 2025"
+.SH NAME
+.B bth
+\- create a Bytes-to-Header file in C/C++.
+
+.SH SYNOPSIS
+.B bth
+[
+.B \-i
+.I file
+]
+[
+.B \-o
+.I file
+]
+[
+.B \-c
+.I bytes
+]
+[
+.B \-f
+.I name
+]
+
+.SH DESCRIPTION
+.B bth
+converts binary files into C/C++ header files by embedding the binary data as an unsigned char array.
+
+.SH OPTIONS
+Command-line options:
+
+.TP
+.B \-h, \-\-help
+Display this help message and exit.
+
+.TP
+.BI \-i " file"
+Specify the input file.
+
+.TP
+.BI \-c " bytes"
+Specify the number of bytes to read from the input file.
+
+.TP
+.BI \-o " file"
+Specify the output header file.
+
+.TP
+.BI \-f " name"
+Specify the name of the generated function or variable.
+
+.TP
+.B \-V, \-\-version
+Display version information and copyright.
+
+.SH EXIT CODES
+.TP
+0 - Success
+.TP
+1 - Error occurred (e.g., missing file, invalid parameters)
+
+.SH AUTHOR
+MrR736
