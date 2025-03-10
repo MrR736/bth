@@ -1,5 +1,21 @@
 # bth : Bytes To Header in C/C++ Utility
 
+#### Command Help
+```
+bth --help
+Usage: bth -i <input> -o <output> -f <name> -c <count>
+
+Options:
+  --help, -h       Display this help and exit
+  --version, -V    Display version information and exit
+  -c <n>           Number of bytes to read
+  -f <name>        Name of generated array
+  -i <file>        Input file
+  -o <file>        Output file
+
+HomePage: <https://github.com/MrR736>
+```
+
 #### Command
 ```
 bth -c 14 -i Input.txt -o Output.h -f NAME
