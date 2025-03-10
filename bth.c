@@ -22,23 +22,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
-#define VERSION "1.0"
+#define VERSION "1.1"
 
 void print_usage(const char *progname) {
-    printf("Usage: %s [OPTION]...\n\n", progname);
-    printf("<OPTION>\n");
-    printf("  --help, -h     display this help and exit\n");
-    printf("  --version, -V  display version information and exit\n");
-    printf("  -c <n>         Count BYTES\n");
-    printf("  -f <name>      Name function\n");
-    printf("  -i <file>      Input File\n");
-    printf("  -o <file>      Output File\n\n");
-    printf("HomePage: <https://github.com/MrR736>\n");
+    printf("Usage: %s -i <input> -o <output> -f <name> -c <count>\n\n", progname);
+    printf("Options:\n");
+    printf("  --help, -h       Display this help and exit\n");
+    printf("  --version, -V    Display version information and exit\n");
+    printf("  -c <n>           Number of bytes to read\n");
+    printf("  -f <name>        Name of generated array\n");
+    printf("  -i <file>        Input file\n");
+    printf("  -o <file>        Output file\n\n");
 }
 
 void print_version(const char *progname) {
-    printf("%s (Bytes To Header) %s\n\nCopyright (C) 2022 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by MrR736\n\nThis bth program was built with SELinux support.\nSELinux is disabled on this system.\n\nHomePage: <https://github.com/MrR736>.\n", progname, VERSION);
+    printf("%s (Bytes To Header) %s\n\nWritten by MrR736.\n", progname, VERSION);
 }
 
 void sanitize_function_name(char *name) {
@@ -59,6 +59,11 @@ void sanitize_function_name(char *name) {
 }
 
 int main(int argc, char *argv[]) {
+    if (argc == 1) {
+        print_usage(argv[0]);
+        return EXIT_FAILURE;
+    }
+
     char *input_file = NULL, *output_file = NULL, *function_name = NULL;
     int count = -1;
 
@@ -66,52 +71,53 @@ int main(int argc, char *argv[]) {
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_usage(argv[0]);
-            exit(0);
+            return EXIT_SUCCESS;
         } else if (strcmp(argv[i], "--version") == 0 || strcmp(argv[i], "-V") == 0) {
             print_version(argv[0]);
-            exit(0);
+            return EXIT_SUCCESS;
         } else if (strcmp(argv[i], "-c") == 0) {
             if (i + 1 < argc) {
-                count = atoi(argv[++i]);
-                if (count <= 0) {
-                    fprintf(stderr, "Error: Count must be a positive integer.\n");
-                    exit(1);
+                char *endptr;
+                count = strtol(argv[++i], &endptr, 10);
+                if (*endptr != '\0' || count <= 0) {
+                    fprintf(stderr, "Error: Invalid count value '%s'. Must be a positive integer.\n", argv[i]);
+                    return EXIT_FAILURE;
                 }
             } else {
                 fprintf(stderr, "Error: Missing value for -c <n>\n");
-                exit(1);
+                return EXIT_FAILURE;
             }
         } else if (strcmp(argv[i], "-f") == 0) {
             if (i + 1 < argc) {
                 function_name = argv[++i];
             } else {
                 fprintf(stderr, "Error: Missing value for -f <name>\n");
-                exit(1);
+                return EXIT_FAILURE;
             }
         } else if (strcmp(argv[i], "-i") == 0) {
             if (i + 1 < argc) {
                 input_file = argv[++i];
             } else {
                 fprintf(stderr, "Error: Missing value for -i <file>\n");
-                exit(1);
+                return EXIT_FAILURE;
             }
         } else if (strcmp(argv[i], "-o") == 0) {
             if (i + 1 < argc) {
                 output_file = argv[++i];
             } else {
                 fprintf(stderr, "Error: Missing value for -o <file>\n");
-                exit(1);
+                return EXIT_FAILURE;
             }
         } else {
             fprintf(stderr, "Error: Unknown option '%s'\n", argv[i]);
-            exit(1);
+            return EXIT_FAILURE;
         }
     }
 
     if (!input_file || !output_file || !function_name || count <= 0) {
-        fprintf(stderr, "%s: invalid option -- 'l'\n", argv[0]);
+        fprintf(stderr, "%s: missing required options\n", argv[0]);
         fprintf(stderr, "Try '%s --help' for more information.\n", argv[0]);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     sanitize_function_name(function_name);
@@ -119,14 +125,14 @@ int main(int argc, char *argv[]) {
     FILE *in = fopen(input_file, "rb");
     if (!in) {
         perror("Error opening input file");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     FILE *out = fopen(output_file, "w");
     if (!out) {
         perror("Error opening output file");
         fclose(in);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     fprintf(out, "/* Generated with Bytes To Header */\n\n");
@@ -152,5 +158,5 @@ int main(int argc, char *argv[]) {
     fclose(out);
 
     printf("Successfully written %d bytes to %s\n", bytes_read, output_file); // load bar
-    return 0;
+    return EXIT_SUCCESS;
 }
