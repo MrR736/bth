@@ -35,6 +35,7 @@ void print_usage(const char *progname) {
     printf("  -f <name>        Name of generated array\n");
     printf("  -i <file>        Input file\n");
     printf("  -o <file>        Output file\n\n");
+    printf("HomePage: <https://github.com/MrR736>\n");
 }
 
 void print_version(const char *progname) {
