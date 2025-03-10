@@ -24,7 +24,7 @@
 #include <string.h>
 #include <errno.h>
 
-#define VERSION "1.1"
+#define VERSION "1.1-rc1"
 
 void print_usage(const char *progname) {
     printf("Usage: %s -i <input> -o <output> -f <name> -c <count>\n\n", progname);
@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    fprintf(out, "/* Generated with Bytes To Header */\n\n");
+    fprintf(out, "/* Generated with Bytes To Header %s */\n\n", VERSION);
     fprintf(out, "unsigned char %s[] = {\n  ", function_name);
 
     unsigned char buffer;
@@ -153,11 +153,13 @@ int main(int argc, char *argv[]) {
         bytes_read++;
     }
 
-    fprintf(out, "\n};\n");
+    fprintf(out, "\n};\n\n");
+
+    fprintf(out, "/* Bytes : %d */\n", bytes_read);
 
     fclose(in);
     fclose(out);
 
-    printf("Successfully written %d bytes to %s\n", bytes_read, output_file); // load bar
+    printf("Successfully written %d bytes to %s\n", bytes_read, output_file);
     return EXIT_SUCCESS;
 }
