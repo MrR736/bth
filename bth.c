@@ -27,7 +27,7 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 
-#define VERSION "1.2-rc1"
+#define VERSION "1.1-rc3"
 #define BYTES_PER_LINE 12
 #define BUFFER_SIZE 4096
 
@@ -142,6 +142,7 @@ int main(int argc, char *argv[]) {
 
     fprintf(out, "/* Generated with Bytes To Header\n * Version: %s\n * Input File: %s\n * Output File: %s\n * Bytes: %zu\n */\n\n", VERSION, basename(input_file), basename(output_file), total_bytes);
     fprintf(out, "#ifndef %s_H\n#define %s_H\n\n", upper, upper);
+    fprintf(out, "#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n");
     fprintf(out, "%s", text_mode ? "" : "#include <stdint.h>\n\n");
 
     fprintf(out, "#define %s_SIZE %zu\n\n", upper, total_bytes);
@@ -180,7 +181,7 @@ int main(int argc, char *argv[]) {
         fprintf(out, "\n};\n\n");
     }
 
-    fprintf(out, "#endif // %s_H\n", upper);
+    fprintf(out, "#ifdef __cplusplus\n}\n#endif\n\n#endif // %s_H\n", upper);
 
     fclose(in);
     fclose(out);
