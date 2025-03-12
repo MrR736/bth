@@ -34,8 +34,11 @@ $(TARGET):
 arch:
 	for arch in x86_64 i386 aarch64 mips64el; do $(MAKE) UNAME_M=$$arch; done
 
-install: $(TARGET)
+install:
 	cp -r $(OUTPUT_DIR)/$(TARGET) /usr/local/bin/
+
+uninstall:
+	rm -f /usr/local/bin/$(TARGET)
 
 clean:
 	rm -rf .lib
