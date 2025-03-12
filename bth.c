@@ -23,52 +23,52 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
+#include <stdbool.h>
+#include <sys/stat.h>
 
-#define VERSION "1.1-rc1"
+#define VERSION "1.1-rc2"
+#define BYTES_PER_LINE 12
+#define BUFFER_SIZE 4096
 
 void print_usage(const char *progname) {
-    printf("Usage: %s -i <input> -o <output> -f <name> -c <count>\n\n", progname);
-    printf("Options:\n");
-    printf("  --help, -h       Display this help and exit\n");
-    printf("  --version, -V    Display version information and exit\n");
-    printf("  -c <n>           Number of bytes to read\n");
-    printf("  -f <name>        Name of generated array\n");
-    printf("  -i <file>        Input file\n");
-    printf("  -o <file>        Output file\n\n");
-    printf("HomePage: <https://github.com/MrR736>\n");
+    fprintf(stderr, "Usage: %s -i <input> -o <output> -f <name> [-c <count>] [-v] [-s] [-t]\n", progname);
 }
 
 void print_version(const char *progname) {
     printf("%s (Bytes To Header) %s\n\nWritten by MrR736.\n", progname, VERSION);
 }
 
-void sanitize_function_name(char *name) {
-    if (!name || !*name) {
-        fprintf(stderr, "Error: Function name cannot be empty.\n");
-        exit(1);
+char *sanitize_name(const char *name) {
+    if (!name || !*name) return NULL;
+    char *sanitized = strdup(name);
+    if (!sanitized) return NULL;
+    if (!isalpha(sanitized[0]) && sanitized[0] != '_') sanitized[0] = '_';
+    for (char *c = sanitized + 1; *c; c++) {
+        if (!isalnum(*c) && *c != '_') *c = '_';
     }
+    return sanitized;
+}
 
-    if (!((*name >= 'a' && *name <= 'z') || (*name >= 'A' && *name <= 'Z') || *name == '_')) {
-        *name = '_';  // Ensure first character is valid
-    }
+char *uppercase_name(const char *name) {
+    size_t len = strlen(name);
+    char *upper = malloc(len + 1);
+    if (!upper) return NULL;
+    for (size_t i = 0; i < len; i++) upper[i] = toupper((unsigned char)name[i]);
+    upper[len] = '\0';
+    return upper;
+}
 
-    for (char *c = name + 1; *c; c++) {
-        if (!((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || (*c >= '0' && *c <= '9') || *c == '_')) {
-            *c = '_';
-        }
-    }
+const char* basename(const char *path) {
+    const char *base = strrchr(path, '/');
+    return base ? base + 1 : path;
 }
 
 int main(int argc, char *argv[]) {
-    if (argc == 1) {
-        print_usage(argv[0]);
-        return EXIT_FAILURE;
-    }
-
     char *input_file = NULL, *output_file = NULL, *function_name = NULL;
     int count = -1;
+    bool verbose = false, struct_mode = false, text_mode = false;
 
-    // Parse arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_usage(argv[0]);
@@ -76,90 +76,120 @@ int main(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "--version") == 0 || strcmp(argv[i], "-V") == 0) {
             print_version(argv[0]);
             return EXIT_SUCCESS;
-        } else if (strcmp(argv[i], "-c") == 0) {
-            if (i + 1 < argc) {
-                char *endptr;
-                count = strtol(argv[++i], &endptr, 10);
-                if (*endptr != '\0' || count <= 0) {
-                    fprintf(stderr, "Error: Invalid count value '%s'. Must be a positive integer.\n", argv[i]);
-                    return EXIT_FAILURE;
-                }
-            } else {
-                fprintf(stderr, "Error: Missing value for -c <n>\n");
+        } else if (strcmp(argv[i], "-c") == 0 && i + 1 < argc) {
+            count = atoi(argv[++i]);
+            if (count <= 0) {
+                fprintf(stderr, "Invalid count value.\n");
                 return EXIT_FAILURE;
             }
-        } else if (strcmp(argv[i], "-f") == 0) {
-            if (i + 1 < argc) {
-                function_name = argv[++i];
-            } else {
-                fprintf(stderr, "Error: Missing value for -f <name>\n");
-                return EXIT_FAILURE;
-            }
-        } else if (strcmp(argv[i], "-i") == 0) {
-            if (i + 1 < argc) {
-                input_file = argv[++i];
-            } else {
-                fprintf(stderr, "Error: Missing value for -i <file>\n");
-                return EXIT_FAILURE;
-            }
-        } else if (strcmp(argv[i], "-o") == 0) {
-            if (i + 1 < argc) {
-                output_file = argv[++i];
-            } else {
-                fprintf(stderr, "Error: Missing value for -o <file>\n");
-                return EXIT_FAILURE;
-            }
+        } else if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
+            function_name = argv[++i];
+        } else if (strcmp(argv[i], "-i") == 0 && i + 1 < argc) {
+            input_file = argv[++i];
+        } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+            output_file = argv[++i];
+        } else if (strcmp(argv[i], "-v") == 0) {
+            verbose = true;
+        } else if (strcmp(argv[i], "-s") == 0) {
+            struct_mode = true;
+        } else if (strcmp(argv[i], "-t") == 0) {
+            text_mode = true;
         } else {
-            fprintf(stderr, "Error: Unknown option '%s'\n", argv[i]);
+            fprintf(stderr, "Unknown option '%s'\n", argv[i]);
             return EXIT_FAILURE;
         }
     }
 
-    if (!input_file || !output_file || !function_name || count <= 0) {
-        fprintf(stderr, "%s: missing required options\n", argv[0]);
-        fprintf(stderr, "Try '%s --help' for more information.\n", argv[0]);
+    if (!input_file || !output_file || !function_name) {
+        fprintf(stderr, "Missing required options\n");
         return EXIT_FAILURE;
     }
 
-    sanitize_function_name(function_name);
+    char *sanitized = sanitize_name(function_name);
+    char *upper = uppercase_name(sanitized);
+    if (!sanitized || !upper) {
+        fprintf(stderr, "Memory allocation failed\n");
+        free(sanitized);
+        free(upper);
+        return EXIT_FAILURE;
+    }
 
-    FILE *in = fopen(input_file, "rb");
+    FILE *in = (strcmp(input_file, "-") == 0) ? stdin : fopen(input_file, "rb");
     if (!in) {
-        perror("Error opening input file");
+        fprintf(stderr, "Error opening input file '%s': %s\n", input_file, strerror(errno));
+        free(sanitized);
+        free(upper);
         return EXIT_FAILURE;
     }
 
     FILE *out = fopen(output_file, "w");
     if (!out) {
-        perror("Error opening output file");
+        fprintf(stderr, "Error opening output file '%s': %s\n", output_file, strerror(errno));
         fclose(in);
+        free(sanitized);
+        free(upper);
         return EXIT_FAILURE;
     }
 
-    fprintf(out, "/* Generated with Bytes To Header %s */\n\n", VERSION);
-    fprintf(out, "unsigned char %s[] = {\n  ", function_name);
+    size_t total_bytes = 0;
 
-    unsigned char buffer;
-    int bytes_read = 0;
+    unsigned char buffer[BUFFER_SIZE];
+    size_t read_bytes;
 
-    while (bytes_read < count && fread(&buffer, 1, 1, in) == 1) {
-        if (bytes_read > 0) {
-            fprintf(out, ", ");
-            if (bytes_read % 12 == 0) {
-                fprintf(out, "\n  ");
-            }
-        }
-        fprintf(out, "0x%02x", buffer);
-        bytes_read++;
+    while ((read_bytes = fread(buffer, 1, (count > 0 ? (size_t)(count - total_bytes) : BUFFER_SIZE), in)) > 0) {
+        total_bytes += read_bytes;
     }
 
-    fprintf(out, "\n};\n\n");
+    fprintf(out, "/* Generated with Bytes To Header\n * Version: %s\n * Input File: %s\n * Output File: %s\n * Bytes: %zu\n */\n\n", VERSION, basename(input_file), basename(output_file), total_bytes);
+    fprintf(out, "#ifndef %s_H\n#define %s_H\n\n", upper, upper);
+    fprintf(out, "%s", text_mode ? "" : "#include <stdint.h>\n\n");
 
-    fprintf(out, "/* Bytes : %d */\n", bytes_read);
+    fprintf(out, "#define %s_SIZE %zu\n\n", upper, total_bytes);
+
+    rewind(in); // Reset file pointer for second pass.
+
+    if (struct_mode) {
+        fprintf(out, "struct __attribute__((aligned(%s_SIZE))) %s_struct {\n  unsigned char data[%s_SIZE];\n};\n\n", upper, sanitized, upper);
+        fprintf(out, "static const struct %s_struct %s = {\n  .data = {", sanitized, sanitized);
+    } else {
+        fprintf(out, "%s %s[%s_SIZE] = {", text_mode ? "static const uint8_t" : "static const unsigned char", sanitized, upper);
+    }
+
+    total_bytes = 0;
+    while ((read_bytes = fread(buffer, 1, BUFFER_SIZE, in)) > 0) {
+        for (size_t i = 0; i < read_bytes; i++) {
+            if (total_bytes > 0) fprintf(out, ", ");
+            if (total_bytes % BYTES_PER_LINE == 0) fprintf(out, "\n%s", struct_mode ? "    " : "  ");
+            fprintf(out, "0x%02x", buffer[i]);
+            total_bytes++;
+        }
+    }
+
+    if (ferror(in)) {
+        fprintf(stderr, "Error reading input file\n");
+        fclose(in);
+        fclose(out);
+        free(sanitized);
+        free(upper);
+        return EXIT_FAILURE;
+    }
+
+    if (struct_mode) {
+        fprintf(out, "\n  }\n};\n\n");
+    } else {
+        fprintf(out, "\n};\n\n");
+    }
+
+    fprintf(out, "#endif // %s_H\n", upper);
 
     fclose(in);
     fclose(out);
+    free(sanitized);
+    free(upper);
 
-    printf("Successfully written %d bytes to %s\n", bytes_read, output_file);
+    if (verbose) {
+        printf("Successfully written %zu bytes to %s\n", total_bytes, output_file);
+    }
+
     return EXIT_SUCCESS;
 }
