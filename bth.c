@@ -27,7 +27,7 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 
-#define VERSION "1.1-rc3"
+#define VERSION "1.2-rc2"
 #define BYTES_PER_LINE 12
 #define BUFFER_SIZE 4096
 
