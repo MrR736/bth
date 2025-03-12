@@ -37,8 +37,6 @@ arch:
 install: $(TARGET)
 	cp -r $(OUTPUT_DIR)/$(TARGET) /usr/local/bin/
 
-all_clean:
-	for arch in x86_64 i386 aarch64 mips64el; do $(MAKE) UNAME_M=$$arch clean; done
-
 clean:
-	rm -rf .lib $(TARGET) $(TARGET).$(ARCH)
+	rm -rf .lib
+	for arch in x86_64 x86 aarch64 mips64el; do rm -f $(TARGET).$$arch clean; done
