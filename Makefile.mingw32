@@ -1,0 +1,29 @@
+# MinGW Compiler for 64-bit Windows
+CC_64 := x86_64-w64-mingw32-gcc
+CC_86 := i686-w64-mingw32-gcc
+CFLAGS := -Wall -Wextra -O2 -I.
+
+src := bth.c
+
+# Define the executable names for different targets
+EXE_X86 := bth-x86.exe # 32-bit version
+EXE := bth.exe # 64-bit version
+
+# Default target
+all: $(EXE_X86) $(EXE)
+
+# Compile for 32-bit X86 version (Windows)
+$(EXE_X86): $(src)
+	$(CC_86) $(CFLAGS) -m32 -o $(EXE_X86) $(src)
+
+# Compile for 64-bit version (Windows)
+$(EXE): $(src)
+	$(CC_64) $(CFLAGS) -o $(EXE) $(src)
+
+# Clean
+clean:
+ifeq ($(OS),Windows_NT)
+	del /F /Q $(EXE_X86) $(EXE) 2>nul || rm -f $(EXE_X86) $(EXE)
+else
+	rm -f $(EXE_X86) $(EXE)
+endif

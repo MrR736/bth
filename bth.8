@@ -1,65 +1,52 @@
-.\" Copyright (C) 2025 MrR736
-.\"
-.TH BTH 1 "March 2025"
+.TH BTH 8 "March 2025" "1.0.0" "BTH Manual"
 .SH NAME
-.B bth
-\- create a Bytes-to-Header file in C/C++.
-
+bth \- Bytes To Header Utility
 .SH SYNOPSIS
 .B bth
-[
-.B \-i
-.I file
-]
-[
-.B \-o
-.I file
-]
-[
-.B \-c
-.I bytes
-]
-[
-.B \-f
-.I name
-]
-
+.I -i <input>
+.I -o <output>
+.I -f <name>
+[ .I -c <count> ]
+[ .B -v ]
+[ .B -s ]
+[ .B -t ]
+[ .B --ms-sys ]
 .SH DESCRIPTION
-.B bth
-converts binary files into C/C++ header files by embedding the binary data as an unsigned char array.
-
+Bytes To Header Utility in C/C++
 .SH OPTIONS
-Command-line options:
-
 .TP
-.B \-h, \-\-help
-Display this help message and exit.
-
+.B -h, --help
+Display this help and exit.
 .TP
-.BI \-i " file"
-Specify the input file.
-
+.B -V, --version
+Display version information and exit.
 .TP
-.BI \-c " bytes"
-Specify the number of bytes to read from the input file.
-
+.B -i <input>
+Input file.
 .TP
-.BI \-o " file"
-Specify the output header file.
-
+.B -o <output>
+Output file.
 .TP
-.BI \-f " name"
-Specify the name of the generated function or variable.
-
+.B -f <name>
+Name of the generated array.
 .TP
-.B \-V, \-\-version
-Display version information and copyright.
-
-.SH EXIT CODES
+.B -c <count>
+Number of bytes to read.
 .TP
-0 - Success
+.B -v
+Enable verbose output.
 .TP
-1 - Error occurred (e.g., missing file, invalid parameters)
-
+.B -s
+Enable silent mode.
+.TP
+.B -t
+Enable test mode.
+.TP
+.B --ms-sys
+Enable MS-SYS mode.
+.SH EXAMPLES
+.B bth
+.I -i input.txt -o output.h -f result_name -c 10 -v
+Clo 'input.txt' to
 .SH AUTHOR
-MrR736
+Written by MrR736.

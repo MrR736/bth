@@ -27,16 +27,26 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 
-#define VERSION "1.2-rc2"
-#define BYTES_PER_LINE 12
-#define BUFFER_SIZE 4096
+#include "bth.h"
 
 void print_usage(const char *progname) {
-    fprintf(stderr, "Usage: %s -i <input> -o <output> -f <name> [-c <count>] [-v] [-s] [-t]\n", progname);
+    vprintf("Usage: %s -i <input> -o <output> -f <name> [-c <count>] [-v] [-s] [-t] [-m, --ms-sys]\n"
+            "Options:\n"
+            "  --help, -h       Display this help and exit\n"
+            "  --version, -V    Display version information and exit\n"
+            "  -i <input>       Input file\n"
+            "  -o <output>      Output file\n"
+            "  -f <name>        Name of generated array\n"
+            "  -c <count>       Number of bytes to read (Max: %s)\n"
+            "  -v               Verbose output\n"
+            "  -s               Silent mode\n"
+            "  -t               Test mode\n"
+            "  -m ,--ms-sys     Enable MS-SYS mode\n"
+            "  -h               Show this help message", progname, TEXT_MAX);
 }
 
 void print_version(const char *progname) {
-    printf("%s (Bytes To Header) %s\n\nWritten by MrR736.\n", progname, VERSION);
+    vprintf("%s (Bytes To Header) %s\n\nWritten by MrR736.", progname, VERSION);
 }
 
 char *sanitize_name(const char *name) {
@@ -60,14 +70,19 @@ char *uppercase_name(const char *name) {
 }
 
 const char* basename(const char *path) {
+    if (!path || !*path) return "unknown";
     const char *base = strrchr(path, '/');
+#ifdef _WIN32
+    const char *win_base = strrchr(path, '\\');
+    if (win_base && (!base || win_base > base)) base = win_base;
+#endif
     return base ? base + 1 : path;
 }
 
 int main(int argc, char *argv[]) {
     char *input_file = NULL, *output_file = NULL, *function_name = NULL;
     int count = -1;
-    bool verbose = false, struct_mode = false, text_mode = false;
+    bool verbose = false, struct_mode = false, text_mode = false, ms_sys_mode = false;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -79,7 +94,7 @@ int main(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "-c") == 0 && i + 1 < argc) {
             count = atoi(argv[++i]);
             if (count <= 0) {
-                fprintf(stderr, "Invalid count value.\n");
+                print_error("Invalid count value");
                 return EXIT_FAILURE;
             }
         } else if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
@@ -94,70 +109,103 @@ int main(int argc, char *argv[]) {
             struct_mode = true;
         } else if (strcmp(argv[i], "-t") == 0) {
             text_mode = true;
+        } else if (strcmp(argv[i], "--ms-sys") == 0 || strcmp(argv[i], "-m") == 0) {
+            ms_sys_mode = true;
         } else {
-            fprintf(stderr, "Unknown option '%s'\n", argv[i]);
+            print_error("Unknown option '%s'", argv[i]);
             return EXIT_FAILURE;
         }
     }
 
-    if (!input_file || !output_file || !function_name) {
-        fprintf(stderr, "Missing required options\n");
+    #ifdef ENABLED_BUFFER_MAX
+    if (count > BUFFER_MAX) {
+        print_error("Maximum Size is %d", BUFFER_MAX);
         return EXIT_FAILURE;
+    }
+    #endif
+
+    if (!input_file) {
+        print_error("Missing required options");
+        return EXIT_FAILURE;
+    }
+
+    if (!output_file) {
+        output_file = "file.h";
+    }
+
+    if (!function_name) {
+        function_name = "function";
     }
 
     char *sanitized = sanitize_name(function_name);
     char *upper = uppercase_name(sanitized);
     if (!sanitized || !upper) {
-        fprintf(stderr, "Memory allocation failed\n");
-        free(sanitized);
-        free(upper);
+        print_error("Memory allocation failed");
+        if (sanitized) free(sanitized);
+        if (upper) free(upper);
         return EXIT_FAILURE;
     }
 
     FILE *in = (strcmp(input_file, "-") == 0) ? stdin : fopen(input_file, "rb");
     if (!in) {
-        fprintf(stderr, "Error opening input file '%s': %s\n", input_file, strerror(errno));
-        free(sanitized);
-        free(upper);
+        print_error("Opening input file '%s': %s", input_file, strerror(errno));
+        if (sanitized) free(sanitized);
+        if (upper) free(upper);
         return EXIT_FAILURE;
     }
 
     FILE *out = fopen(output_file, "w");
     if (!out) {
-        fprintf(stderr, "Error opening output file '%s': %s\n", output_file, strerror(errno));
-        fclose(in);
-        free(sanitized);
-        free(upper);
+        print_error("opening output file '%s': %s", output_file, strerror(errno));
+        if (in != stdin) fclose(in);
+        if (sanitized) free(sanitized);
+        if (upper) free(upper);
         return EXIT_FAILURE;
     }
 
-    size_t total_bytes = 0;
+    size_t memory_bytes = 0;
 
-    unsigned char buffer[BUFFER_SIZE];
+    #ifdef ENABLED_BUFFER_MAX
+    unsigned char buffer[BUFFER_MAX];
+    #else
+    unsigned char buffer[count];
+    #endif
+
     size_t read_bytes;
 
-    while ((read_bytes = fread(buffer, 1, (count > 0 ? (size_t)(count - total_bytes) : BUFFER_SIZE), in)) > 0) {
-        total_bytes += read_bytes;
+    while ((read_bytes = fread(buffer, 1, (count > 0 ? (size_t)(count - memory_bytes) : sizeof(buffer)), in)) > 0) {
+        memory_bytes += read_bytes;
     }
 
-    fprintf(out, "/* Generated with Bytes To Header\n * Version: %s\n * Input File: %s\n * Output File: %s\n * Bytes: %zu\n */\n\n", VERSION, basename(input_file), basename(output_file), total_bytes);
-    fprintf(out, "#ifndef %s_H\n#define %s_H\n\n", upper, upper);
-    fprintf(out, "#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n");
-    fprintf(out, "%s", text_mode ? "" : "#include <stdint.h>\n\n");
-
-    fprintf(out, "#define %s_SIZE %zu\n\n", upper, total_bytes);
+    fprintf(out,
+    "/*\n"
+    " * Generated with Bytes To Header\n"
+    " * Version: %s\n"
+    " * Input File: %s\n"
+    " * Output File: %s\n"
+    " * Bytes: %zu\n"
+    " */\n\n",
+    VERSION, basename(input_file), basename(output_file), memory_bytes);
+    if (!ms_sys_mode) {
+        fprintf(out, "#ifndef %s_H\n#define %s_H\n\n", upper, upper);
+        fprintf(out, "#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n");
+        fprintf(out, "%s", text_mode ? "" : "#include <stdint.h>\n\n");
+        fprintf(out, "#define %s_SIZE %zu\n\n", upper, memory_bytes);
+    }
 
     rewind(in); // Reset file pointer for second pass.
 
-    if (struct_mode) {
+    if (ms_sys_mode) {
+        fprintf(out, "unsigned char %s[] = {", sanitized);
+    } else if (struct_mode) {
         fprintf(out, "struct __attribute__((aligned(%s_SIZE))) %s_struct {\n  unsigned char data[%s_SIZE];\n};\n\n", upper, sanitized, upper);
         fprintf(out, "static const struct %s_struct %s = {\n  .data = {", sanitized, sanitized);
     } else {
         fprintf(out, "%s %s[%s_SIZE] = {", text_mode ? "static const uint8_t" : "static const unsigned char", sanitized, upper);
     }
 
-    total_bytes = 0;
-    while ((read_bytes = fread(buffer, 1, BUFFER_SIZE, in)) > 0) {
+    size_t total_bytes = 0;
+    while ((read_bytes = fread(buffer, 1, (count > 0 ? (size_t)(count - total_bytes) : sizeof(buffer)), in)) > 0) {
         for (size_t i = 0; i < read_bytes; i++) {
             if (total_bytes > 0) fprintf(out, ", ");
             if (total_bytes % BYTES_PER_LINE == 0) fprintf(out, "\n%s", struct_mode ? "    " : "  ");
@@ -167,7 +215,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (ferror(in)) {
-        fprintf(stderr, "Error reading input file\n");
+        print_error("reading input file");
         fclose(in);
         fclose(out);
         free(sanitized);
@@ -181,7 +229,11 @@ int main(int argc, char *argv[]) {
         fprintf(out, "\n};\n\n");
     }
 
-    fprintf(out, "#ifdef __cplusplus\n}\n#endif\n\n#endif // %s_H\n", upper);
+    if (!ms_sys_mode) {
+        fprintf(out, "#ifdef __cplusplus\n}\n#endif\n\n#endif // %s_H\n", upper);
+    }
+
+    fprintf(out, "\n// Output Bytes: %zu\n\n", total_bytes);
 
     fclose(in);
     fclose(out);
@@ -189,7 +241,7 @@ int main(int argc, char *argv[]) {
     free(upper);
 
     if (verbose) {
-        printf("Successfully written %zu bytes to %s\n", total_bytes, output_file);
+        vprintf("Successfully written %zu bytes to %s", memory_bytes, output_file);
     }
 
     return EXIT_SUCCESS;
