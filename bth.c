@@ -41,7 +41,7 @@ void print_usage(const char *progname) {
             "  -v               Verbose output\n"
             "  -s               Silent mode\n"
             "  -t               Test mode\n"
-            "  -m ,--ms-sys     Enable MS-SYS mode\n"
+            "  -m, --ms-sys     Enable MS-SYS mode\n"
             "  -h               Show this help message", progname, TEXT_MAX);
 }
 

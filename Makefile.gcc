@@ -16,6 +16,9 @@ else
     $(error Unsupported architecture: $(UNAME_M))
 endif
 
+# UPX := upx
+# UPXFLAGS := --best
+
 SRC := bth.c
 
 TARGET := bth
@@ -24,11 +27,12 @@ all: $(TARGET)
 
 $(TARGET):
 	$(CC) -Wall -Wextra -O2 -I. $(SRC) -o $(TARGET).$(ARCH)
+#       $(UPX) $(UPXFLAGS) $(TARGET).$(ARCH)
 
 arch:
 	@for arch in x86_64 i386 aarch64 mips64el; do $(MAKE) UNAME_M=$$arch; done
 
-install:
+install: $(TARGET)
 	@echo "Installing executable to /usr/local/bin"
 	@cp $(TARGET).$(ARCH) /usr/local/bin/$(TARGET)
 
