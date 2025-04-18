@@ -1,6 +1,6 @@
 /* bth.c - Bytes To Header Utility
  *
- * Copyright (C) 2025 MrR736 <https://github.com/MrR736>
+ * Copyright (C) 2025 MrR736 <MrR736@users.github.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,8 +30,8 @@
 #include "bth.h"
 
 void print_usage(const char *progname) {
-    vprintf("Usage: %s -i <input> -o <output> -f <name> [-c <count>] [-v] [-s] [-t] [-m, --ms-sys]\n"
-            "Options:\n"
+    vprint("Usage: %s -i <input> -o <output> -f <name> [-c <count>] [-v] [-s] [-t] [-m, --ms-sys]\n\n"
+            "<Options>\n"
             "  --help, -h       Display this help and exit\n"
             "  --version, -V    Display version information and exit\n"
             "  -i <input>       Input file\n"
@@ -40,13 +40,14 @@ void print_usage(const char *progname) {
             "  -c <count>       Number of bytes to read (Max: %s)\n"
             "  -v               Verbose output\n"
             "  -s               Silent mode\n"
-            "  -t               Test mode\n"
-            "  -m, --ms-sys     Enable MS-SYS mode\n"
+            "  -t               Text mode\n"
+            "  -m, --ms-sys     MS-SYS mode\n"
+            "  -e               Tests mode\n"
             "  -h               Show this help message", progname, TEXT_MAX);
 }
 
 void print_version(const char *progname) {
-    vprintf("%s (Bytes To Header) %s\n\nWritten by MrR736.", progname, VERSION);
+    vprint("%s (Bytes To Header) %s\n\nWritten by MrR736.", progname, VERSION);
 }
 
 char *sanitize_name(const char *name) {
@@ -82,7 +83,7 @@ const char* basename(const char *path) {
 int main(int argc, char *argv[]) {
     char *input_file = NULL, *output_file = NULL, *function_name = NULL;
     int count = -1;
-    bool verbose = false, struct_mode = false, text_mode = false, ms_sys_mode = false;
+    bool verbose = false, struct_mode = false, text_mode = false, ms_sys_mode = false, test_mode = false;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -94,7 +95,7 @@ int main(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "-c") == 0 && i + 1 < argc) {
             count = atoi(argv[++i]);
             if (count <= 0) {
-                print_error("Invalid count value");
+                bdebug("Invalid count value");
                 return EXIT_FAILURE;
             }
         } else if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
@@ -109,23 +110,25 @@ int main(int argc, char *argv[]) {
             struct_mode = true;
         } else if (strcmp(argv[i], "-t") == 0) {
             text_mode = true;
+        } else if (strcmp(argv[i], "-e") == 0) {
+            test_mode = true;
         } else if (strcmp(argv[i], "--ms-sys") == 0 || strcmp(argv[i], "-m") == 0) {
             ms_sys_mode = true;
         } else {
-            print_error("Unknown option '%s'", argv[i]);
+            bdebug("Unknown option '%s'", argv[i]);
             return EXIT_FAILURE;
         }
     }
 
     #ifdef ENABLED_BUFFER_MAX
     if (count > BUFFER_MAX) {
-        print_error("Maximum Size is %d", BUFFER_MAX);
+        bdebug("Maximum Size is %d", BUFFER_MAX);
         return EXIT_FAILURE;
     }
     #endif
 
     if (!input_file) {
-        print_error("Missing required options");
+        bdebug("Missing required options");
         return EXIT_FAILURE;
     }
 
@@ -140,7 +143,7 @@ int main(int argc, char *argv[]) {
     char *sanitized = sanitize_name(function_name);
     char *upper = uppercase_name(sanitized);
     if (!sanitized || !upper) {
-        print_error("Memory allocation failed");
+        bdebug("Memory allocation failed");
         if (sanitized) free(sanitized);
         if (upper) free(upper);
         return EXIT_FAILURE;
@@ -148,7 +151,7 @@ int main(int argc, char *argv[]) {
 
     FILE *in = (strcmp(input_file, "-") == 0) ? stdin : fopen(input_file, "rb");
     if (!in) {
-        print_error("Opening input file '%s': %s", input_file, strerror(errno));
+        bdebug("Opening input file '%s': %s", input_file, strerror(errno));
         if (sanitized) free(sanitized);
         if (upper) free(upper);
         return EXIT_FAILURE;
@@ -156,7 +159,7 @@ int main(int argc, char *argv[]) {
 
     FILE *out = fopen(output_file, "w");
     if (!out) {
-        print_error("opening output file '%s': %s", output_file, strerror(errno));
+        bdebug("opening output file '%s': %s", output_file, strerror(errno));
         if (in != stdin) fclose(in);
         if (sanitized) free(sanitized);
         if (upper) free(upper);
@@ -196,7 +199,7 @@ int main(int argc, char *argv[]) {
     rewind(in); // Reset file pointer for second pass.
 
     if (ms_sys_mode) {
-        fprintf(out, "unsigned char %s[] = {", sanitized);
+        fprintf(out, "unsigned char %s[%zu] = {", sanitized, memory_bytes);
     } else if (struct_mode) {
         fprintf(out, "struct __attribute__((aligned(%s_SIZE))) %s_struct {\n  unsigned char data[%s_SIZE];\n};\n\n", upper, sanitized, upper);
         fprintf(out, "static const struct %s_struct %s = {\n  .data = {", sanitized, sanitized);
@@ -215,7 +218,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (ferror(in)) {
-        print_error("reading input file");
+        bdebug("reading input file");
         fclose(in);
         fclose(out);
         free(sanitized);
@@ -230,10 +233,17 @@ int main(int argc, char *argv[]) {
     }
 
     if (!ms_sys_mode) {
-        fprintf(out, "#ifdef __cplusplus\n}\n#endif\n\n#endif // %s_H\n", upper);
+        fprintf(out, "#ifdef __cplusplus\n}\n#endif\n\n#endif // %s_H\n\n", upper);
     }
 
-    fprintf(out, "\n// Output Bytes: %zu\n\n", total_bytes);
+    if (test_mode) {
+        fprintf(out,
+        " /*\n"
+        " * Tests\n"
+        " * Bytes: %zu\n"
+        " */",
+        total_bytes);
+    }
 
     fclose(in);
     fclose(out);
@@ -241,7 +251,7 @@ int main(int argc, char *argv[]) {
     free(upper);
 
     if (verbose) {
-        vprintf("Successfully written %zu bytes to %s", memory_bytes, output_file);
+        vprint("Successfully written %zu bytes to %s", memory_bytes, output_file);
     }
 
     return EXIT_SUCCESS;

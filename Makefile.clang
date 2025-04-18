@@ -1,0 +1,43 @@
+UNAME_M := $(shell uname -m)
+
+ifeq ($(UNAME_M), x86_64)
+    CC = clang
+    ARCH := clang.x86_64
+else ifneq ($(filter i386 i486 i586 i686, $(UNAME_M)),)
+    CC := clang -m32
+    ARCH := clang.x86
+else ifeq ($(UNAME_M), aarch64)
+    CC = aarch64-linux-gnu-clang
+    ARCH := clang.aarch64
+else ifeq ($(UNAME_M), mips64el)
+    CC = mips64-linux-gnuabi64-clang -mips64r2 -mabi=64
+    ARCH := clang.mips64el
+else
+    $(error Unsupported architecture: $(UNAME_M))
+endif
+
+# UPX := upx
+# UPXFLAGS := --best
+
+SRC := bth.c
+
+TARGET := bth
+
+all: $(TARGET)
+
+$(TARGET):
+	$(CC) -Wall -Wextra -O2 -I. $(SRC) -o $(TARGET).$(ARCH)
+#       $(UPX) $(UPXFLAGS) $(TARGET).$(ARCH)
+
+arch:
+	@for arch in x86_64 i386 aarch64 mips64el; do $(MAKE) UNAME_M=$$arch; done
+
+install: $(TARGET)
+	@echo "Installing executable to /usr/local/bin"
+	@cp $(TARGET).$(ARCH) /usr/local/bin/$(TARGET)
+
+uninstall:
+	@rm -f /usr/local/bin/$(TARGET)
+
+clean:
+	@for arch in x86_64 x86 aarch64 mips64el; do rm -f $(TARGET).$$arch clean; done
